@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Big Tech Hisse Analizi</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --tx:#1c2230; --mut:#6b7385; --bd:#dde1e8; --ac:#2457d6; --ok:#1a7f4b; --wr:#b26a00; --er:#c0392b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --card:#1b2029; --tx:#e7eaf0; --mut:#98a1b3; --bd:#2b3240; --ac:#6c93f5; --ok:#4cc38a; --wr:#e0a040; --er:#ef7a6c; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--tx); }
+  header { padding:18px 24px 6px; }
+  h1 { margin:0; font-size:22px; }
+  .sub { color:var(--mut); font-size:13px; }
+  .sub a { color:var(--ac); text-decoration:none; font-weight:600; }
+  .uyari { margin:10px 24px; padding:10px 14px; border:1px solid var(--wr); border-radius:8px; color:var(--wr); font-size:13px; }
+  main { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; padding:8px 24px 32px; max-width:1200px; margin:auto; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:16px; }
+  .wide { grid-column:1/-1; }
+  h2 { margin:0 0 10px; font-size:16px; }
+  label { display:block; font-size:13px; color:var(--mut); margin:8px 0 2px; }
+  select,input,button { font:inherit; padding:7px 10px; border:1px solid var(--bd); border-radius:8px; background:var(--card); color:var(--tx); }
+  input, select { width:100%; }
+  button { background:var(--ac); color:#fff; border-color:var(--ac); cursor:pointer; margin-top:12px; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .row { display:flex; gap:10px; align-items:end; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:120px; }
+  .big { font-size:26px; font-weight:600; }
+  .kv { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed var(--bd); font-size:14px; }
+  .kv span:first-child { color:var(--mut); }
+  .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:13px; font-weight:600; border:1px solid currentColor; }
+  .dusuk { color:var(--ok); } .orta { color:var(--wr); } .yuksek { color:var(--er); }
+  .hata { color:var(--er); font-size:14px; margin-top:8px; white-space:pre-wrap; }
+  .not { color:var(--mut); font-size:12px; margin-top:8px; }
+  .warn { color:var(--wr); font-size:13px; margin-top:6px; }
+  canvas { width:100%; height:320px; display:block; }
+  .leg { font-size:12px; color:var(--mut); margin-top:6px; }
+  .leg i { display:inline-block; width:10px; height:10px; margin:0 4px 0 12px; border-radius:2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Big Tech Hisse Analizi</h1>
+  <div class="sub">FastAPI servisinin web arayüzü: ARIMA tahmini, volatilite/risk ve makro model · <a href="/docs">API dokümantasyonu (Swagger)</a></div>
+</header>
+<div class="uyari">Eğitim amaçlıdır, yatırım tavsiyesi değildir. Fiyat tahmin modelleri test döneminde basit referansı (dünün fiyatı) belirgin şekilde geçemedi.</div>
+
+<main>
+  <section class="card wide">
+    <h2>1. Fiyat geçmişi ve ARIMA tahmini</h2>
+    <div class="row">
+      <div><label for="sembol">Şirket</label><select id="sembol"></select></div>
+      <div><label for="gun">Tahmin günü (1-60)</label><input id="gun" type="number" min="1" max="60" value="30"></div>
+      <div><button id="btnF">Tahmin et</button></div>
+    </div>
+    <div id="fHata" class="hata"></div>
+    <canvas id="cv"></canvas>
+    <div class="leg"><i style="background:#8a93a6"></i>Gerçek kapanış<i style="background:var(--ac)"></i>ARIMA tahmini<i style="background:rgba(36,87,214,.22)"></i>%95 güven aralığı<i style="background:var(--wr)"></i>Son kapanış (naive)</div>
+    <div id="fOzet" class="not"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. Volatilite ve risk</h2>
+    <div id="vBody" class="not">Şirket seçilince yüklenir.</div>
+    <div id="vHata" class="hata"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. Makro değerlerden fiyat tahmini</h2>
+    <div class="row">
+      <div><label>İşsizlik (%)</label><input id="m_unemployment_rate" type="number" step="0.1" value="3.6"></div>
+      <div><label>CPI</label><input id="m_cpi" type="number" step="0.1" value="108.4"></div>
+      <div><label>Enflasyon (%)</label><input id="m_inflation_rate" type="number" step="0.1" value="2.3"></div>
+    </div>
+    <div class="row">
+      <div><label>İpotek faizi (%)</label><input id="m_mortgage_interest_rate" type="number" step="0.1" value="3.7"></div>
+      <div><label>Tahvil getirisi (%)</label><input id="m_corporate_bond_yield" type="number" step="0.1" value="3.0"></div>
+    </div>
+    <button id="btnM">Tahmin et</button>
+    <div id="mSonuc"></div>
+    <div id="mHata" class="hata"></div>
+    <div class="not">Model şirketi tanımaz: aynı değerler için tüm şirketlere aynı sayı çıkar.</div>
+  </section>
+
+  <section class="card wide">
+    <h2>4. Model bilgisi</h2>
+    <div id="info" class="not">Yükleniyor…</div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const hataYaz = (el, j) => {
+  let s = j.hata || "Bilinmeyen hata";
+  if (j.detay) s += "\n" + j.detay.map(d => `• ${d.alan}: ${d.mesaj}`).join("\n");
+  $(el).textContent = s;
+};
+async function api(yol, opt) {
+  let r;
+  try { r = await fetch(yol, opt); } catch { throw { hata: "Sunucuya bağlanılamadı. uvicorn çalışıyor mu?" }; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw j;
+  return j;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const kv = (a, b) => `<div class="kv"><span>${a}</span><span>${b}</span></div>`;
+
+/* ---------- Grafik (dış kütüphanesiz) ---------- */
+function ciz(gecmis, tah) {
+  const cv = $("cv"), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const c = cv.getContext("2d"); c.scale(dpr, dpr); c.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement);
+  const mut = css.getPropertyValue("--mut").trim(), bd = css.getPropertyValue("--bd").trim(),
+        ac = css.getPropertyValue("--ac").trim(), wr = css.getPropertyValue("--wr").trim();
+  const nG = gecmis.kapanis.length, nT = tah ? tah.tahminler.length : 0, n = nG + nT;
+  let vals = gecmis.kapanis.slice();
+  if (tah) tah.tahminler.forEach(t => vals.push(t.alt_95, t.ust_95));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+  const L = 52, R = 12, T = 10, B = 24;
+  const x = i => L + (W - L - R) * i / Math.max(n - 1, 1), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  c.font = "11px system-ui"; c.fillStyle = mut; c.strokeStyle = bd; c.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4, yy = y(v);
+    c.beginPath(); c.moveTo(L, yy); c.lineTo(W - R, yy); c.stroke(); c.fillText(v.toFixed(0), 6, yy + 4);
+  }
+  const tarihler = gecmis.tarihler.concat(tah ? tah.tahminler.map(t => t.tarih) : []);
+  [0, Math.floor((n - 1) / 2), n - 1].forEach((i, k) => {
+    c.textAlign = k === 0 ? "left" : k === 2 ? "right" : "center"; c.fillText(tarihler[i], x(i), H - 6);
+  });
+  c.textAlign = "left";
+  // gerçek seri
+  c.strokeStyle = "#8a93a6"; c.lineWidth = 1.6; c.beginPath();
+  gecmis.kapanis.forEach((v, i) => i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v))); c.stroke();
+  if (!tah) return;
+  // güven aralığı
+  c.fillStyle = "rgba(36,87,214,.22)"; c.beginPath(); c.moveTo(x(nG - 1), y(gecmis.kapanis[nG - 1]));
+  tah.tahminler.forEach((t, i) => c.lineTo(x(nG + i), y(t.ust_95)));
+  for (let i = nT - 1; i >= 0; i--) c.lineTo(x(nG + i), y(tah.tahminler[i].alt_95));
+  c.closePath(); c.fill();
+  // naive çizgisi
+  c.strokeStyle = wr; c.setLineDash([5, 4]); c.beginPath();
+  c.moveTo(x(nG - 1), y(tah.naive_referans)); c.lineTo(x(n - 1), y(tah.naive_referans)); c.stroke(); c.setLineDash([]);
+  // tahmin
+  c.strokeStyle = ac; c.lineWidth = 2; c.beginPath(); c.moveTo(x(nG - 1), y(gecmis.kapanis[nG - 1]));
+  tah.tahminler.forEach((t, i) => c.lineTo(x(nG + i), y(t.tahmin))); c.stroke();
+}
+
+let sonGecmis = null, sonTahmin = null;
+async function gecmisYukle() {
+  $("fHata").textContent = ""; $("fOzet").textContent = ""; sonTahmin = null;
+  try { sonGecmis = await api(`/history/${$("sembol").value}?days=250`); ciz(sonGecmis, null); }
+  catch (j) { hataYaz("fHata", j); }
+  volatiliteYukle();
+}
+async function tahminEt() {
+  const b = $("btnF"); b.disabled = true; b.textContent = "Hesaplanıyor…"; $("fHata").textContent = "";
+  try {
+    if (!sonGecmis) await gecmisYukle();
+    sonTahmin = await api(`/forecast/${$("sembol").value}?days=${encodeURIComponent($("gun").value)}`);
+    ciz(sonGecmis, sonTahmin);
+    const son = sonTahmin.tahminler[sonTahmin.tahminler.length - 1];
+    $("fOzet").innerHTML = `${esc(sonTahmin.sirket)}: son gerçek kapanış <b>${sonTahmin.son_gercek_kapanis}</b> (${sonTahmin.son_gercek_tarih}). `
+      + `${sonTahmin.gun_sayisi}. günde tahmin <b>${son.tahmin}</b> (aralık ${son.alt_95} – ${son.ust_95}). Tahmin naive çizgisine çok yakındır: ARIMA bu veride dünün fiyatını belirgin geçemedi.`;
+  } catch (j) { hataYaz("fHata", j); }
+  b.disabled = false; b.textContent = "Tahmin et";
+}
+async function volatiliteYukle() {
+  $("vHata").textContent = "";
+  try {
+    const v = await api(`/volatility/${$("sembol").value}`);
+    $("vBody").innerHTML = `<div class="big"><span class="badge ${v.risk_seviyesi === "düşük" ? "dusuk" : v.risk_seviyesi === "orta" ? "orta" : "yuksek"}">risk: ${esc(v.risk_seviyesi)}</span></div>`
+      + kv("Tahmini günlük volatilite (20 gün)", `%${v.tahmin_gunluk_volatilite_yuzde}`)
+      + kv("Yıllıklandırılmış", `%${v.tahmin_yillik_volatilite_yuzde}`)
+      + kv("Şu anki 20 günlük volatilite", `%${v.mevcut_20g_gunluk_volatilite_yuzde}`)
+      + kv("Şirketin geçmişine göre yüzdelik", `%${v.gecmise_gore_yuzdelik}`)
+      + kv("Model test R² / naive R²", `${v.model_test_r2} / ${v.naive_test_r2}`)
+      + `<div class="not">${esc(v.not)}</div>`;
+  } catch (j) { $("vBody").textContent = ""; hataYaz("vHata", j); }
+}
+async function makroTahmin() {
+  const b = $("btnM"); b.disabled = true; $("mHata").textContent = ""; $("mSonuc").innerHTML = "";
+  const g = {};
+  for (const k of ["unemployment_rate", "cpi", "inflation_rate", "mortgage_interest_rate", "corporate_bond_yield"]) {
+    const v = $("m_" + k).value; g[k] = v === "" ? null : Number(v);
+  }
+  try {
+    const j = await api("/predict/macro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
+    $("mSonuc").innerHTML = `<div class="big">${j.tahmin_kapanis_fiyati} $</div>` + kv("Doğrusal regresyon", j.tahmin_kapanis_fiyati)
+      + kv("Random Forest", j.diger_modeller.random_forest)
+      + j.uyarilar.map(u => `<div class="warn">⚠ ${esc(u)}</div>`).join("");
+  } catch (j) { hataYaz("mHata", j); }
+  b.disabled = false;
+}
+async function baslat() {
+  try {
+    const s = await api("/symbols");
+    $("sembol").innerHTML = s.semboller.map(x => `<option value="${esc(x.sembol)}">${esc(x.sembol)}${x.sirket ? " – " + esc(x.sirket) : ""}</option>`).join("");
+    $("sembol").value = "AAPL";
+    gecmisYukle();
+  } catch (j) { hataYaz("fHata", j); }
+  try {
+    const i = await api("/model-info"), t = i.test_metrikleri, vt = i.volatilite_test;
+    const satir = (ad, m) => `<tr><td>${ad}</td><td>${m.RMSE}</td><td>${m.MAE}</td><td>${m.MAPE}</td><td>${m.R2}</td></tr>`;
+    $("info").innerHTML = `Eğitim: ${i.egitim_araligi.baslangic} → ${i.egitim_araligi.bitis} (${i.egitim_araligi.satir} satır). Test: ${i.test_araligi.baslangic} → ${i.test_araligi.bitis} (${i.test_araligi.satir} satır).`
+      + `<table style="width:100%;margin-top:8px;font-size:13px;border-collapse:collapse"><tr style="text-align:left;color:var(--mut)"><th>Model</th><th>RMSE</th><th>MAE</th><th>MAPE %</th><th>R²</th></tr>`
+      + satir("Baseline (ortalama)", t.baseline) + satir("Doğrusal regresyon", t.linear_regression) + satir("Random Forest", t.random_forest) + `</table>`
+      + (vt ? `<div style="margin-top:8px">Volatilite modeli (HAR): test R² <b>${vt.test_r2_har}</b>, naive referansı ${vt.test_r2_naive}.</div>` : "")
+      + `<div class="not">${esc(i.not)}</div>`;
+  } catch (j) { $("info").textContent = j.hata || "Model bilgisi alınamadı."; }
+}
+$("sembol").addEventListener("change", gecmisYukle);
+$("btnF").addEventListener("click", tahminEt);
+$("btnM").addEventListener("click", makroTahmin);
+window.addEventListener("resize", () => sonGecmis && ciz(sonGecmis, sonTahmin));
+baslat();
+</script>
+</body>
+</html>
